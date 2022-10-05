@@ -31,6 +31,7 @@ func (ur *ReceiptRepo) ListReceiptsByPosted(posted *bool) (*[]model.EInvoice, er
 
 func (ur *ReceiptRepo) FindUnPostedReciepts(info *model.CompanyInfo) ([]model.Receipt, error) {
 	var resp []model.Receipt
+	var serials []int
 	// var taxRecord model.TaxTotals
 	rows, err := ur.db.Raw("EXEC StkTrEInvoiceListReceipts").Rows()
 	if utils.CheckErr(&err) {
@@ -38,30 +39,47 @@ func (ur *ReceiptRepo) FindUnPostedReciepts(info *model.CompanyInfo) ([]model.Re
 	}
 	defer rows.Close()
 	for rows.Next() {
+		var serial int
 		var rec model.Receipt
-		// var taxRecord model.TaxTotals
+		var taxRecord model.TaxTotals
 		// taxRecord.Amount =
 		// taxRecord.Amount =
-		err := rows.Scan(&rec.Serial, &rec.Header.DateTimeIssued, &rec.Header.ReceiptNumber, &rec.TotalItemsDiscount, &rec.TotalAmount, &rec.TaxTotals.Amount, &rec.Seller.BranchCode, &rec.DocumentType.ReceiptType)
+		err := rows.Scan(
+			&serial,
+			&rec.Header.DateTimeIssued,
+			&rec.Header.ReceiptNumber,
+			&rec.TotalItemsDiscount,
+			&rec.TotalAmount,
+			&taxRecord.Amount,
+			&rec.Seller.BranchCode,
+			&rec.DocumentType.ReceiptType,
+			&rec.Seller.BranchAddress.Country,
+			&rec.Seller.BranchAddress.Governate,
+			&rec.Seller.BranchAddress.RegionCity,
+			&rec.Seller.BranchAddress.Street,
+			&rec.Seller.BranchAddress.BuildingNumber,
+		)
 		if utils.CheckErr(&err) {
 			return nil, err
 		}
-		rec.Header.ReceiptNumber = fmt.Sprintf("%s-%d", rec.Seller.BranchCode, rec.Serial)
+		rec.Header.ReceiptNumber = fmt.Sprintf("%s-%d", rec.Seller.BranchCode, serial)
 		rec.Header.Currency = "EGP"
-		rec.Buyer.Type = "B"
-		rec.DocumentType.ReceiptType = "s"
-		rec.DocumentType.TypeVersion = "1.1"
+		rec.Buyer.Type = "P"
+		// rec.DocumentType.ReceiptType = "s"
+		rec.DocumentType.TypeVersion = "1.0"
 		rec.Seller.Rin = info.EtaRegistrationId
 		rec.Seller.CompanyTradeName = info.ComName
 		rec.Seller.DeviceSerialNumber = "123"
 		rec.TotalItemsDiscount = 0
-		rec.ExtraReceiptDiscount = make([]float64, 1)
 		rec.PaymentMethod = "C"
-		rec.TotalSales = rec.TotalAmount + rec.TaxTotals.Amount
-		rec.TaxTotals.TaxType = "T1"
-		rec.ExtraReceiptDiscount = append(rec.ExtraReceiptDiscount, 0.0)
-		// rec.TaxTotals =
+		rec.TotalSales = rec.TotalAmount + taxRecord.Amount
+		taxRecord.TaxType = "T1"
+		rec.Seller.ActivityCode = info.EtaActivityCode
+		rec.TaxTotals = make([]model.TaxTotals, 0)
+		// rec.ExtraReceiptDiscount = append(rec.ExtraReceiptDiscount, 0.0)
+		rec.TaxTotals = append(rec.TaxTotals, taxRecord)
 		resp = append(resp, rec)
+		serials = append(serials, serial)
 	}
 	if rows.NextResultSet() {
 		var headSerial int
@@ -74,22 +92,22 @@ func (ur *ReceiptRepo) FindUnPostedReciepts(info *model.CompanyInfo) ([]model.Re
 			// var head int
 			err := rows.Scan(
 				&headSerial,
+				&rec.InternalCode,
 				&rec.Description,
 				&rec.ItemType,
 				&rec.ItemCode,
 				&rec.UnitType,
 				&rec.Quantity,
 				&rec.UnitPrice,
+				&rec.NetSale,
 				&discount,
 				&rec.TotalSale,
 				&rec.Total,
 			)
-			// _prepareInvoiceItem(&rec)
 			if utils.CheckErr(&err) {
 				return nil, err
 			}
-
-			if resp[counter].Serial != headSerial {
+			if serials[counter] != headSerial {
 				counter++
 			}
 			resp[counter].ItemData = append(resp[counter].ItemData, rec)

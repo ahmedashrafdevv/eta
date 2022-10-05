@@ -133,7 +133,15 @@ func SerializeInvoice(invoice interface{}) string {
 			if !ok {
 				slice2, ok2 := currentValueReflictor.Interface().([]float64)
 				if !ok2 {
-					panic("cant convert slices")
+					slice3, ok3 := currentValueReflictor.Interface().([]model.TaxTotals)
+					for k := 0; k < len(slice3); k++ {
+						serializedString += fmt.Sprintf("%s%s%s", "\"", currentValueKey, "\"")
+						serializedString += SerializeInvoice(slice3[k])
+						// serializedString += fmt.Sprintf("%v", currentValueReflictor.Interface())
+					}
+					if !ok3 {
+						panic("cant convert slices")
+					}
 				} else {
 					for k := 0; k < len(slice2); k++ {
 						serializedString += fmt.Sprintf("%s%s%s", "\"", currentValueKey, "\"")
@@ -143,44 +151,25 @@ func SerializeInvoice(invoice interface{}) string {
 				}
 
 			} else {
+
 				for k := 0; k < len(slice); k++ {
 					itemReflector := reflect.ValueOf(slice[k])
-					itemValue := itemReflector.Field(k).Interface()
-					itemValueKey := strings.ToUpper(itemReflector.Type().Field(k).Name)
-					serializedString += fmt.Sprintf("%s%s%s", "\"", itemValueKey, "\"")
-					serializedString += SerializeInvoice(itemValue)
+					serializedString += fmt.Sprintf("%s%s%s", "\"", currentValueKey, "\"")
+					// itemValue := itemReflector.Field(k).Interface()
+					// itemValueKey := strings.ToUpper(itemReflector.Type().Field(k).Name)
+					for j := 0; j < itemReflector.NumField(); j++ {
+
+						itemValue2 := itemReflector.Field(j).Interface()
+						itemValueKey2 := strings.ToUpper(itemReflector.Type().Field(j).Name)
+						serializedString += fmt.Sprintf("%s%s%s", "\"", itemValueKey2, "\"")
+						serializedString += SerializeInvoice(itemValue2)
+					}
+
 				}
 			}
 
 		}
 
 	}
-
 	return serializedString
 }
-
-// if documentStructure is simple value type
-// return """ + documentStructure.value + """
-// end if
-
-// var serializedString = ""
-
-// foreach element in the structure:
-
-// if element is not array type
-// 	serializeString.Append (""" + element.name.uppercase + """)
-// 	serializeString.Append ( Serialize(element.value) )
-// end if
-
-// if element is of array type
-// 	serializeString.Append (""" + element.name.uppercase + """)
-// 	foreach array element in element:
-// 		// use below line for JSON because subelements of array in JSON do not have own names
-// 		serializeString.Append (""" + element.name.uppercase + """)
-// 		serializeString.Append ( Serialize(arrayelement.value) )
-// 	end foreach
-// end if
-
-// end foreach
-
-// return serializedString

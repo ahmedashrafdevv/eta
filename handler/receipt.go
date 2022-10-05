@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"eta/utils"
 	"fmt"
 	"net/http"
@@ -27,6 +29,11 @@ func (h *Handler) ReceiptPost(c echo.Context) error {
 	}
 
 	serialized := utils.SerializeInvoice(receipts[0])
+	hash := sha256.New()
+	hash.Write([]byte(serialized))
+	sha1_hash := hex.EncodeToString(hash.Sum(nil))
+	receipts[0].Header.Uuid = sha1_hash
+	fmt.Println("serialized")
 	fmt.Println(serialized)
-	return c.JSON(http.StatusOK, receipts)
+	return c.JSON(http.StatusOK, receipts[0])
 }
