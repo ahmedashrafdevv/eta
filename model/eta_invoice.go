@@ -150,6 +150,10 @@ type InvoiceSubmitRequest struct {
 	Documents []SignedInvoice `json:"documents"`
 }
 
+type ReceiptSubmitRequest struct {
+	Receipts []Receipt `json:"receipts"`
+}
+
 type InvoiceFindResp struct {
 	Serial                   int
 	DateTimeIssued           string

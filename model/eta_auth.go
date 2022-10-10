@@ -8,7 +8,7 @@ type EtaLoginRequest struct {
 
 type EtaLoginResponse struct {
 	AccessToken string `json:"access_token"`
-	ExpiresIn   string `json:"expires_in"`
+	ExpiresIn   int    `json:"expires_in"`
 	TokenType   string `json:"token_type"`
 	Scope       string `json:"scope"`
 }
@@ -17,4 +17,5 @@ type EtaSubmitInvoiceResponse struct {
 	SubmissionId      string `json:"submissionId"`
 	AcceptedDocuments string `json:"acceptedDocuments"`
 	RejectedDocuments string `json:"rejectedDocuments"`
+	Header            string `json:"header"`
 }

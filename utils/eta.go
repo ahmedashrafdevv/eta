@@ -11,30 +11,58 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"time"
 )
 
 // client := &http.Client{
 //   CheckRedirect: redirectPolicyFunc,
 // }
 
-var base_url = "https://api.invoicing.eta.gov.eg/api/v1"
+var base_url = GenerateConfigBasedOnEnv("INVOICING_URL")
+var auth_url = GenerateConfigBasedOnEnv("AUTH_URL")
+var client_id = GenerateConfigBasedOnEnv("CLIENT_ID")
+var client_secret = GenerateConfigBasedOnEnv("CLIENT_SECRET")
+var pos_secret = GenerateConfigBasedOnEnv("POS_SECRET")
+var pos_version = config.Config("POS_VERSION")
+var pos_serial = config.Config("POS_SERIAL")
+var client = &http.Client{}
+var location, _ = time.LoadLocation("Africa/Cairo")
+var lastLoginExpiresAt time.Time
+var token string
 
+func GenerateConfigBasedOnEnv(key string) string {
+	fullKey := fmt.Sprintf("%s_%s", key, config.Config("ENVIRONMENT"))
+	return config.Config(fullKey)
+}
+
+func SetContentType(req *http.Request) {
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+}
+
+func SetAuthorization(req *http.Request) {
+	isTokenExpired := time.Now().Before(lastLoginExpiresAt)
+	if isTokenExpired || token == "" {
+		EtaLoginPos()
+	}
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Authorization", "Bearer "+token)
+}
+
+func GenerateRequestBody() url.Values {
+	data := url.Values{}
+	data.Set("client_id", client_id)
+	data.Set("client_secret", client_secret)
+	data.Set("grant_type", "client_credentials")
+	return data
+}
 func EtaLogin() (string, error) {
 	var response model.EtaLoginResponse
-	// apiUrl := "https://id.preprod.eta.gov.eg"
 	resource := "/connect/token"
-	data := url.Values{}
-	data.Set("client_id", "92fe559b-c17e-4275-a12e-132d34189ef1")
-	data.Set("client_secret", "1e0c3a98-b4df-489b-b366-25e3aa5e28c6")
-	data.Set("grant_type", "client_credentials")
-	u, _ := url.ParseRequestURI(base_url)
-	u.Path = resource
-	urlStr := u.String()
-	fmt.Println(urlStr)
-	client := &http.Client{}
-	r, _ := http.NewRequest(http.MethodPost, "https://id.eta.gov.eg/connect/token", strings.NewReader(data.Encode())) // URL-encoded payload
-	// r.Header.Add("Authorization", "auth_token=\"XXXXXXX\"")
-	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	data := GenerateRequestBody()
+	url := auth_url + resource
+
+	r, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(data.Encode()))
+	SetContentType(r)
 	resp, _ := client.Do(r)
 	d, _ := ioutil.ReadAll(resp.Body)
 	err := json.Unmarshal(d, &response)
@@ -42,6 +70,30 @@ func EtaLogin() (string, error) {
 		return "", err
 	}
 	resp.Body.Close()
+	lastLoginExpiresAt = time.Now().In(location).Add(1 * time.Hour)
+	return response.AccessToken, nil
+}
+
+func EtaLoginPos() (string, error) {
+	var response model.EtaLoginResponse
+	resource := "connect/token"
+	data := GenerateRequestBody()
+	url := auth_url + resource
+
+	r, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(data.Encode()))
+	SetContentType(r)
+	r.Header.Add("posserial", pos_serial)
+	r.Header.Add("pososversion", pos_version)
+	r.Header.Add("presharedkey", pos_secret)
+	resp, _ := client.Do(r)
+	d, _ := ioutil.ReadAll(resp.Body)
+	err := json.Unmarshal(d, &response)
+	if err != nil {
+		return "", err
+	}
+	resp.Body.Close()
+	lastLoginExpiresAt = time.Now().In(location).Add(1 * time.Hour)
+	token = response.AccessToken
 	return response.AccessToken, nil
 }
 
@@ -65,38 +117,40 @@ func SignInvoices(invoices *[]model.Invoice) (*model.InvoiceSubmitRequest, error
 	return &doc, nil
 }
 
-func SubmitInvoice(authToken *string, document *model.InvoiceSubmitRequest) (*model.EtaSubmitInvoiceResponse, error) {
+func SubmitReceipt(document *model.ReceiptSubmitRequest) (*model.EtaSubmitInvoiceResponse, error) {
 	client := &http.Client{}
 	var response model.EtaSubmitInvoiceResponse
 
 	jsonBody, err := json.Marshal(document)
 	if err != nil {
+		fmt.Println("error while parsing doc")
 		return nil, err
 	}
-	// apiUrl := "https://api.preprod.invoicing.eta.gov.eg/api/v1"
-	resource := "/documentsubmissions"
-	// data.Set("client_id", "c70450b9-5b89-48dd-be15-9cf7629f7dd1")
-	// data.Set("client_secret", "7825b824-841c-4f1a-81cd-d8eb60745ee6")
-	// data.Set("grant_type", "client_credentials")
-	u, _ := url.ParseRequestURI(base_url)
-	u.Path = resource
-	urlStr := u.String()
-	fmt.Println(urlStr)
-	r, err := http.NewRequest(http.MethodPost, "https://api.invoicing.eta.gov.eg/api/v1/documentsubmissions", bytes.NewBuffer(jsonBody)) // URL-encoded payload
+	resource := "receiptsubmissions"
+
+	url := base_url + resource
+
+	r, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonBody))
 	if err != nil {
+		fmt.Println("error forming request")
 		return nil, err
 	}
 
-	r.Header.Add("Authorization", "Bearer "+*authToken)
-	r.Header.Add("Content-Type", "application/json")
+	SetAuthorization(r)
 	resp, _ := client.Do(r)
 	d, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
+		fmt.Println("error forming request")
 		return nil, err
 	}
 	err = json.Unmarshal(d, &response)
 	if err != nil {
+		fmt.Println("error parsing response")
+		fmt.Println(d)
+		if resp.StatusCode == 401 {
+			EtaLoginPos()
+		}
 		return nil, err
 	}
 

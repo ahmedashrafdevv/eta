@@ -3,8 +3,8 @@ package handler
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"eta/model"
 	"eta/utils"
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -22,18 +22,23 @@ func (h *Handler) ReceiptsListByPosted(c echo.Context) error {
 }
 
 func (h *Handler) ReceiptPost(c echo.Context) error {
-
+	var recieptsReq model.ReceiptSubmitRequest
 	receipts, err := h.receiptRepo.FindUnPostedReciepts(h.companyInfo)
 	if utils.CheckErr(&err) {
-		return c.JSON(http.StatusOK, err.Error())
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	for i := 0; i < len(receipts); i++ {
+		serialized := utils.SerializeInvoice(receipts[i])
+		hash := sha256.New()
+		hash.Write([]byte(serialized))
+		sha1_hash := hex.EncodeToString(hash.Sum(nil))
+		receipts[i].Header.Uuid = sha1_hash
+		recieptsReq.Receipts = append(recieptsReq.Receipts, receipts[i])
 	}
 
-	serialized := utils.SerializeInvoice(receipts[0])
-	hash := sha256.New()
-	hash.Write([]byte(serialized))
-	sha1_hash := hex.EncodeToString(hash.Sum(nil))
-	receipts[0].Header.Uuid = sha1_hash
-	fmt.Println("serialized")
-	fmt.Println(serialized)
-	return c.JSON(http.StatusOK, receipts[0])
+	resp, err := utils.SubmitReceipt(&recieptsReq)
+	if utils.CheckErr(&err) {
+		return c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, resp)
 }
