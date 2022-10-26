@@ -31,6 +31,31 @@ func (ur *InvoiceRepo) ListEInvoices(req *model.ListInvoicessRequest) (*[]model.
 	return result, nil
 }
 
+func (ur *InvoiceRepo) RecievedInvoiceInsert(req *model.ReceivedInvoiceInsertReq) (*int, error) {
+	var resp int
+
+	err := ur.db.Raw("EXEC EtaRecievedInvoicesHeadInsert  @InternalId = ? , @TotalAmount = ? , @TotalTax = ? , @IssuerName = ?, @IssuerRin = ?, @DateTimeIssued = ? , @DateTimeRecieved = ?   ", req.Invoice.InternalId,
+		req.Invoice.TotalAmount,
+		req.Invoice.TotalTax,
+		req.Invoice.IssuerName,
+		req.Invoice.IssuerRin,
+		req.Invoice.DateTimeIssued,
+		req.Invoice.DateTimeRecieved,
+	).Row().Scan(&resp)
+	if utils.CheckErr(&err) {
+		return nil, err
+	}
+
+	for _, v := range req.Items {
+		err := ur.db.Raw("EXEC EtaRecievedInvoicesDetailsInsert @InvoiceID = ?  , @ItemName = ? ,@ItemType = ? ,@ItemCode = ? ,@Price = ?  ,@Quantity = ?  ,@TotalAmount = ?  ,@TotalTax = ?  ,@SubTotal = ?    ", resp,
+			v.ItemName, v.ItemType, v.ItemCode, v.Price, v.Quantity, v.TotalAmount, v.TotalTax, v.SubTotal,
+		).Row().Scan(&resp)
+		if utils.CheckErr(&err) {
+			return nil, err
+		}
+	}
+	return &resp, nil
+}
 func (ur *InvoiceRepo) EInvoiceHeadPost(serial *uint64, store *uint64) (*int, error) {
 	var resp int
 	err := ur.db.Raw("EXEC StkTrEInvoicePosted @serial = ? , @store = ?  ", serial, store).Row().Scan(&resp)

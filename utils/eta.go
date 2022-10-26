@@ -7,6 +7,7 @@ import (
 	"eta/model"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -28,6 +29,7 @@ var pos_serial = config.Config("POS_SERIAL")
 var client = &http.Client{}
 var location, _ = time.LoadLocation("Africa/Cairo")
 var lastLoginExpiresAt time.Time
+var posToken string
 var token string
 
 func GenerateConfigBasedOnEnv(key string) string {
@@ -37,15 +39,24 @@ func GenerateConfigBasedOnEnv(key string) string {
 
 func SetContentType(req *http.Request) {
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add("Accept", "application/json")
 }
 
+func SetPosAuthorization(req *http.Request) {
+	isTokenExpired := time.Now().Before(lastLoginExpiresAt)
+	if isTokenExpired || posToken == "" {
+		EtaLoginPos()
+	}
+	req.Header.Add("Authorization", "Bearer "+posToken)
+	SetContentType(req)
+}
 func SetAuthorization(req *http.Request) {
 	isTokenExpired := time.Now().Before(lastLoginExpiresAt)
 	if isTokenExpired || token == "" {
-		EtaLoginPos()
+		EtaLogin()
 	}
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Authorization", "Bearer "+token)
+	SetContentType(req)
 }
 
 func GenerateRequestBody() url.Values {
@@ -55,25 +66,98 @@ func GenerateRequestBody() url.Values {
 	data.Set("grant_type", "client_credentials")
 	return data
 }
+
+// func EtaLogin() (string, error) {
+// 	var response model.EtaLoginResponse
+// 	resource := "/connect/token"
+// 	data := GenerateRequestBody()
+// 	url := auth_url + resource
+
+// 	r, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(data.Encode()))
+// 	SetContentType(r)
+// 	resp, _ := client.Do(r)
+// 	d, _ := ioutil.ReadAll(resp.Body)
+// 	err := json.Unmarshal(d, &response)
+// 	if err != nil {
+// 		return "", err
+// 	}
+// 	resp.Body.Close()
+// 	lastLoginExpiresAt = time.Now().In(location).Add(1 * time.Hour)
+// 	return response.AccessToken, nil
+// }
+
 func EtaLogin() (string, error) {
 	var response model.EtaLoginResponse
-	resource := "/connect/token"
+	resource := "connect/token"
 	data := GenerateRequestBody()
 	url := auth_url + resource
-
+	fmt.Println("url")
+	fmt.Println(url)
 	r, _ := http.NewRequest(http.MethodPost, url, strings.NewReader(data.Encode()))
 	SetContentType(r)
+	// r.Header.Add("posserial", pos_serial)
+	// r.Header.Add("pososversion", pos_version)
+	// r.Header.Add("presharedkey", pos_secret)
 	resp, _ := client.Do(r)
 	d, _ := ioutil.ReadAll(resp.Body)
 	err := json.Unmarshal(d, &response)
 	if err != nil {
 		return "", err
 	}
+	fmt.Println("url")
+	fmt.Println(string(d))
 	resp.Body.Close()
 	lastLoginExpiresAt = time.Now().In(location).Add(1 * time.Hour)
+	token = response.AccessToken
 	return response.AccessToken, nil
 }
 
+func EtaRecentDocuments() (*model.EtaRecentDocumentsResponse, error) {
+	var response model.EtaRecentDocumentsResponse
+	resource := "api/v1.0/documents/recent"
+	url := base_url + resource
+
+	r, _ := http.NewRequest(http.MethodGet, url, nil)
+	SetContentType(r)
+	SetAuthorization(r)
+
+	resp, _ := client.Do(r)
+	d, _ := ioutil.ReadAll(resp.Body)
+	err := json.Unmarshal(d, &response)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println("resp.Body")
+	fmt.Println(string(d))
+	fmt.Println(url)
+	// fmt.Println(string(resp.Body))
+	resp.Body.Close()
+	return &response, nil
+}
+
+func EtaRecentDocumentView(id string) (*model.EtaInvoiceDetailsResp, error) {
+	var response model.EtaInvoiceDetailsResp
+	resource := fmt.Sprintf("documents/%s/details", id)
+	url := base_url + resource
+
+	r, _ := http.NewRequest(http.MethodGet, url, nil)
+	SetContentType(r)
+	SetAuthorization(r)
+
+	resp, _ := client.Do(r)
+	d, _ := ioutil.ReadAll(resp.Body)
+	err := json.Unmarshal(d, &response)
+	if err != nil {
+		fmt.Println("error parsing")
+		return nil, err
+	}
+	fmt.Println("resp.Body")
+	fmt.Println(string(d))
+	fmt.Println(url)
+	// fmt.Println(string(resp.Body))
+	resp.Body.Close()
+	return &response, nil
+}
 func EtaLoginPos() (string, error) {
 	var response model.EtaLoginResponse
 	resource := "connect/token"
@@ -93,7 +177,7 @@ func EtaLoginPos() (string, error) {
 	}
 	resp.Body.Close()
 	lastLoginExpiresAt = time.Now().In(location).Add(1 * time.Hour)
-	token = response.AccessToken
+	posToken = response.AccessToken
 	return response.AccessToken, nil
 }
 
@@ -117,9 +201,9 @@ func SignInvoices(invoices *[]model.Invoice) (*model.InvoiceSubmitRequest, error
 	return &doc, nil
 }
 
-func SubmitReceipt(document *model.ReceiptSubmitRequest) (*model.EtaSubmitInvoiceResponse, error) {
+func SubmitReceipt(document *model.ReceiptSubmitRequest) (*model.EtaSubmitInvoiceFailedResponse, error) {
 	client := &http.Client{}
-	var response model.EtaSubmitInvoiceResponse
+	var response model.EtaSubmitInvoiceFailedResponse
 
 	jsonBody, err := json.Marshal(document)
 	if err != nil {
@@ -136,27 +220,36 @@ func SubmitReceipt(document *model.ReceiptSubmitRequest) (*model.EtaSubmitInvoic
 		return nil, err
 	}
 
-	SetAuthorization(r)
+	SetPosAuthorization(r)
 	resp, _ := client.Do(r)
 	d, err := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
+	defer resp.Body.Close()
 	if err != nil {
 		fmt.Println("error forming request")
 		return nil, err
 	}
+	fmt.Println(string(d))
+	fmt.Println(url)
+	fmt.Println(r.Method)
+
+	// fmt.Println(d)
 	err = json.Unmarshal(d, &response)
 	if err != nil {
-		fmt.Println("error parsing response")
-		fmt.Println(d)
 		if resp.StatusCode == 401 {
 			EtaLoginPos()
+		} else {
+			fmt.Println("error parsing response")
+			if err != nil {
+				return nil, err
+			}
 		}
-		return nil, err
 	}
 
 	return &response, nil
 }
 
+// https://api.preprod.invoicing.eta.gov.eg/api/v1/receiptsubmissions
+// https://api.preprod.invoicing.eta.gov.eg/api/v1/receiptsubmissions
 func SerializeInvoice(invoice interface{}) string {
 	invoiceReflector := reflect.ValueOf(invoice)
 	if invoiceReflector.Kind() != reflect.Struct && invoiceReflector.Kind() != reflect.Slice {
@@ -226,4 +319,10 @@ func SerializeInvoice(invoice interface{}) string {
 
 	}
 	return serializedString
+}
+
+func RoundFloat(val *float64, precision uint) float64 {
+	ratio := math.Pow(10, float64(precision))
+	roundedValue := math.Round(*val*ratio) / ratio
+	return roundedValue
 }

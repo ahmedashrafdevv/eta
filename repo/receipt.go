@@ -40,6 +40,7 @@ func (ur *ReceiptRepo) FindUnPostedReciepts(info *model.CompanyInfo) ([]model.Re
 	defer rows.Close()
 	for rows.Next() {
 		var serial int
+		var referenceUUID string
 		var rec model.Receipt
 		var taxRecord model.TaxTotals
 		// taxRecord.Amount =
@@ -48,6 +49,7 @@ func (ur *ReceiptRepo) FindUnPostedReciepts(info *model.CompanyInfo) ([]model.Re
 			&serial,
 			&rec.Header.DateTimeIssued,
 			&rec.Header.ReceiptNumber,
+			&referenceUUID,
 			&rec.TotalItemsDiscount,
 			&rec.TotalAmount,
 			&taxRecord.Amount,

@@ -24,6 +24,8 @@ func (h *Handler) Register(v1 *echo.Group) {
 	// invoices routes
 	invoices := api.Group("/invoices")
 	invoices.GET("", h.InvoicesList)
+	invoices.GET("/recent", h.InvoicesRecentList)
+	invoices.GET("/recent/:id", h.InvoicesRecentView)
 	invoices.POST("/post", h.InvoicePost)
 
 	// receipt routes

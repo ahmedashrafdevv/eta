@@ -154,6 +154,31 @@ type ReceiptSubmitRequest struct {
 	Receipts []Receipt `json:"receipts"`
 }
 
+type ReceivedInvoiceInsertReq struct {
+	Invoice ReceivedInvoice
+	Items   []ReceivedInvoiceItem
+}
+type ReceivedInvoice struct {
+	InternalId       string
+	TotalAmount      float64
+	TotalTax         float64
+	IssuerName       string
+	IssuerRin        string
+	DateTimeIssued   string
+	DateTimeRecieved string
+}
+
+// add three names on item name
+type ReceivedInvoiceItem struct {
+	ItemName    string
+	ItemType    string
+	ItemCode    string
+	Price       float64
+	Quantity    float64
+	TotalAmount float64
+	TotalTax    float64
+	SubTotal    float64
+}
 type InvoiceFindResp struct {
 	Serial                   int
 	DateTimeIssued           string
