@@ -31,6 +31,44 @@ func (ur *OrderRepo) ListByTransSerialStoreConvertedDate(req *model.ListOrdersRe
 	return result, nil
 }
 
+func (ur *OrderRepo) DashboardStoreStats(req *model.DashboardStatsRequest) (*[]model.DashboardStoreStatsResponse, error) {
+	var resp []model.DashboardStoreStatsResponse
+	rows, err := ur.db.Raw("EXEC EtaDashboardStoreStats @start_date = ? , @end_date = ?", req.FromDate, req.ToDate).Rows()
+	if utils.CheckErr(&err) {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rec model.DashboardStoreStatsResponse
+		err := rows.Scan(&rec.TotalAmount, &rec.TotalTax, &rec.StoreName, &rec.StoreCode)
+		if utils.CheckErr(&err) {
+			return nil, err
+		}
+		resp = append(resp, rec)
+
+	}
+	return &resp, nil
+}
+
+func (ur *OrderRepo) DashboardStats() (*[]model.DashboardStatsResponse, error) {
+	var resp []model.DashboardStatsResponse
+	rows, err := ur.db.Raw("EXEC EtaDashboardStats").Rows()
+	if utils.CheckErr(&err) {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rec model.DashboardStatsResponse
+		err := rows.Scan(&rec.TotalAmount, &rec.TotalTax, &rec.Period)
+		if utils.CheckErr(&err) {
+			return nil, err
+		}
+		resp = append(resp, rec)
+
+	}
+	return &resp, nil
+}
+
 func (ur *OrderRepo) ListPosByStoreConvertedDate(req *model.ListPosOrdersRequest) (*[]model.Order, error) {
 	rows, err := ur.db.Raw("EXEC StkTr03ListByStoreConvertedDate  @converted = ? , @storeCode = ? , @fromDate = ? , @toDate = ?", req.Status, req.Store, req.FromDate, req.ToDate).Rows()
 	if utils.CheckErr(&err) {

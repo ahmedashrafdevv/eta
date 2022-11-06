@@ -15,7 +15,36 @@ type EtaLoginResponse struct {
 type EtaRecentDocumentsResponse struct {
 	Result []EtaRecentDocumentsItem `json:"result"`
 }
+type ListReceivedReq struct {
+	FromDate *string `query:"start_date"`
+	ToDate   *string `query:"end_date"`
+	Rin      *string `query:"rin"`
+}
 
+type ListReceivedResp struct {
+	Id               int
+	UUID             string
+	InternalId       string
+	TotalAmount      float64
+	TotalTax         float64
+	IssuerName       string
+	IssuerRin        string
+	DateTimeIssued   string
+	DateTimeReceived string
+}
+
+type ListReceivedItemsResp struct {
+	Id          int
+	ItemName    string
+	ItemType    string
+	ItemCode    string
+	ItemPrice   float64
+	Quantity    float64
+	TotalAmount float64
+	TotalTax    float64
+	SubTotal    float64
+	InvoiceId   int
+}
 type EtaRecentDocumentsItem struct {
 	PublicUrl                     string         `json:"publicUrl"`
 	Uuid                          string         `json:"uuid"`
@@ -27,7 +56,7 @@ type EtaRecentDocumentsItem struct {
 	DocumentTypeNameSecondaryLang string         `json:"documentTypeNameSecondaryLang"`
 	TypeVersionName               string         `json:"typeVersionName"`
 	IssuerId                      string         `json:"issuerId"`
-	UssuerName                    string         `json:"issuerName"`
+	IssuerName                    string         `json:"issuerName"`
 	ReceiverId                    string         `json:"receiverId"`
 	ReceiverName                  string         `json:"receiverName"`
 	DateTimeIssued                string         `json:"dateTimeIssued"`
@@ -114,6 +143,10 @@ type EtaSubmitInvoiceFailedResponse struct {
 	RejectedDocuments []EtaResponseRejected `json:"rejectedDocuments"`
 }
 
+type EtaInvoiceRejectBody struct {
+	Status string `json:"status"`
+	Reason string `json:"reason"`
+}
 type EtaInvoiceDetailsResp struct {
 	SubmissionId                  string               `json:"submissionId"`
 	DateTimeRecevied              string               `json:"dateTimeRecevied"`
@@ -136,7 +169,7 @@ type EtaInvoiceDetailsResp struct {
 	PublicUrl                     string               `json:"publicUrl"`
 	PurchaseOrderDescription      string               `json:"purchaseOrderDescription"`
 	TotalItemsDiscountAmount      float64              `json:"totalItemsDiscountAmount"`
-	Delivery                      float64              `json:"delivery"`
+	Delivery                      Delivery             `json:"delivery"`
 	Payment                       EtaPayment           `json:"payment"`
 	TotalAmount                   float64              `json:"totalAmount"`
 	TaxTotals                     []TaxTotals          `json:"taxTotals"`
@@ -144,10 +177,10 @@ type EtaInvoiceDetailsResp struct {
 	TotalDiscount                 float64              `json:"totalDiscount"`
 	TotalSales                    float64              `json:"totalSales"`
 	InvoiceLines                  []DetailsInvoiceLine `json:"invoiceLines"`
-	References                    string               `json:"references"`
+	References                    []string             `json:"references"`
 	SalesOrderDescription         string               `json:"salesOrderDescription"`
 	SalesOrderReference           string               `json:"salesOrderReference"`
-	ProformaInvoiceNumber         int                  `json:"proformaInvoiceNumber"`
+	ProformaInvoiceNumber         string               `json:"proformaInvoiceNumber"`
 	Signatures                    []DetailsSignature   `json:"signatures"`
 	PurchaseOrderReference        string               `json:"purchaseOrderReference"`
 	InternalID                    string               `json:"internalID"`
@@ -165,6 +198,16 @@ type EtaInvoiceDetailsResp struct {
 	CurrencySegments              []CurrencySegment    `json:"currencySegments"`
 }
 
+type Delivery struct {
+	Approach        string  `json:"approach"`
+	Packaging       string  `json:"packaging"`
+	DateValidity    string  `json:"dateValidity"`
+	ExportPort      string  `json:"exportPort"`
+	CountryOfOrigin string  `json:"countryOfOrigin"`
+	GrossWeight     float64 `json:"grossWeight"`
+	NetWeight       float64 `json:"netWeight"`
+	Terms           string  `json:"terms"`
+}
 type CurrencySegment struct {
 	Currency                 string      `json:"currency"`
 	CurrencyExchangeRate     float64     `json:"currencyExchangeRate"`

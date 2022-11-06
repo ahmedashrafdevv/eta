@@ -156,7 +156,7 @@ type ReceiptSubmitRequest struct {
 
 type ReceivedInvoiceInsertReq struct {
 	Invoice ReceivedInvoice
-	Items   []ReceivedInvoiceItem
+	Items   []EtaRecentDocumentsItem
 }
 type ReceivedInvoice struct {
 	InternalId       string

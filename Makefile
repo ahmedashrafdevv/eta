@@ -1,18 +1,15 @@
-ms:
-	mysql -u root -h 127.0.0.1 --password=secret < db/db.sql && \
-	mysql -u root -h 127.0.0.1 --password=secret < db/seed.sql  
-
-migrate:
-	mysql -u root -h 127.0.0.1 --password=secret < db/db.sql 
+pid:
+	sudo ss -lptn 'sport = :6000'
 
 
-seed:
-	mysql -u root -h 127.0.0.1 --password=secret < db/seed.sql
+run:
+	go run main.go
 
-proc:
-	mysql -u root -h 127.0.0.1 --password=secret < db/proc.sql 
+build:
+	CGO_ENABLED=0 go build .
 
-dball:
-	mysql -u root -h 127.0.0.1 --password=secret < db/db.sql && \
-	mysql -u root -h 127.0.0.1 --password=secret < db/seed.sql && \
-	mysql -u root -h 127.0.0.1 --password=secret < db/proc.sql 
+deploy:
+	CGO_ENABLED=0 go build . && scp eta .env.prod noz:eta
+
+runbg:
+	./eta > /dev/null 2>&1 & 

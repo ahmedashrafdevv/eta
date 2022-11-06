@@ -4,11 +4,19 @@ import (
 	"eta/model"
 	"eta/utils"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 )
 
-func (h *Handler) InvoicesRecentList(c echo.Context) error {
+func handleDate(s *string) {
+	if idx := strings.Index(*s, "."); idx != -1 {
+		*s = (*s)[:idx]
+	}
+	*s = strings.Replace(*s, "T", " ", 1)
+	*s = strings.Replace(*s, "Z", "", 1)
+}
+func (h *Handler) InvoicesRecentEtl(c echo.Context) error {
 	d, err := utils.EtaRecentDocuments()
 	var result []model.EtaRecentDocumentsItem
 	// var req []model.ReceivedInvoiceInsertReq
@@ -17,45 +25,64 @@ func (h *Handler) InvoicesRecentList(c echo.Context) error {
 	}
 	for _, v := range d.Result {
 		if v.IssuerId != "288271998" {
-			v.TotalTax = v.Total - v.TotalSales
-			v.TotalTax = utils.RoundFloat(&v.TotalTax, 5)
-			result = append(result, v)
-			invoiceDetails, err := utils.EtaRecentDocumentView(v.Uuid)
-			if utils.CheckErr(&err) {
-				return c.JSON(http.StatusOK, err.Error())
+			existed := h.invoiceRepo.RecievedInvoiceCheckExists(&v.Uuid)
+			if !existed {
+				v.TotalTax = v.Total - v.TotalSales
+				handleDate(&v.DateTimeIssued)
+				handleDate(&v.DateTimeReceived)
+
+				v.TotalTax = utils.RoundFloat(&v.TotalTax, 5)
+
+				invoiceDetails, err := utils.EtaRecentDocumentView(v.Uuid)
+				if utils.CheckErr(&err) {
+					return c.JSON(http.StatusOK, err.Error())
+				}
+
+				_, err = h.invoiceRepo.RecievedInvoiceInsert(v, invoiceDetails.InvoiceLines)
+				if utils.CheckErr(&err) {
+					return c.JSON(http.StatusOK, err.Error())
+				}
+				result = append(result, v)
 			}
-			return c.JSON(http.StatusOK, invoiceDetails)
-
 		}
-
 	}
 
-	// var req model.ReceivedInvoiceInsertReq
+	return c.JSON(http.StatusOK, d)
+}
 
-	// req.Invoice.InternalId = "Y-2113-202200017451-2022102578000061264"
-	// req.Invoice.TotalAmount = 1546.18
-	// req.Invoice.TotalTax = 1546.18 - 1356.3
-	// req.Invoice.IssuerName = "Al-Futtaim for Commercial and Administrative Centres S.A.E."
-	// req.Invoice.IssuerRin = "339745703"
-	// req.Invoice.DateTimeIssued = "2022-10-25 00:00:00"
-	// req.Invoice.DateTimeRecieved = "2022-10-25 18:37:00"
+func (h *Handler) RecivedInvoicesList(c echo.Context) error {
+	req := new(model.ListReceivedReq)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusUnprocessableEntity, utils.NewError(err))
+	}
+	result, err := h.invoiceRepo.RecievedInvoiceList(req)
+	if utils.CheckErr(&err) {
+		return c.JSON(http.StatusOK, err.Error())
+	}
+	return c.JSON(http.StatusOK, result)
+}
 
-	// var item1 model.ReceivedInvoiceItem
-	// item1.ItemName = "Temporary Classification \n التصنيف المؤقت \n Chilled water-recoveries -Cairo-From 23/09/2022 To 22/10/2022"
-	// item1.ItemType = "EGS"
-	// item1.ItemCode = "99999999"
-	// item1.Price = 1356.3
-	// item1.Quantity = 1.0
-	// item1.TotalAmount = 1546.18
-	// item1.TotalTax = 1546.18 - 1356.3
-	// item1.SubTotal = 1356.3
-
-	// req.Items = append(req.Items, item1)
-
-	// _, err = h.invoiceRepo.RecievedInvoiceInsert(&req)
-	// if utils.CheckErr(&err) {
-	// 	return c.JSON(http.StatusOK, err.Error())
-	// }
+func (h *Handler) RecievedInvoiceReject(c echo.Context) error {
+	req := new(model.EtaInvoiceRejectBody)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusUnprocessableEntity, utils.NewError(err))
+	}
+	id := c.Param("id")
+	d, err := utils.EtaRecentDocumentReject(&id, req)
+	if utils.CheckErr(&err) {
+		return c.JSON(http.StatusOK, err.Error())
+	}
+	return c.JSON(http.StatusOK, d)
+}
+func (h *Handler) RecievedInvoiceListItems(c echo.Context) error {
+	req := new(model.ListReceivedReq)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusUnprocessableEntity, utils.NewError(err))
+	}
+	result, err := h.invoiceRepo.RecievedInvoiceListItems(c.Param("id"))
+	if utils.CheckErr(&err) {
+		return c.JSON(http.StatusOK, err.Error())
+	}
 	return c.JSON(http.StatusOK, result)
 }
 

@@ -31,24 +31,86 @@ func (ur *InvoiceRepo) ListEInvoices(req *model.ListInvoicessRequest) (*[]model.
 	return result, nil
 }
 
-func (ur *InvoiceRepo) RecievedInvoiceInsert(req *model.ReceivedInvoiceInsertReq) (*int, error) {
-	var resp int
+func (ur *InvoiceRepo) RecievedInvoiceListItems(id string) (*[]model.ListReceivedItemsResp, error) {
+	var resp []model.ListReceivedItemsResp
+	rows, err := ur.db.Raw("EXEC EtaRecievedInvoicesDetailsList  @id = ?", id).Rows()
+	if utils.CheckErr(&err) {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rec model.ListReceivedItemsResp
+		err := rows.Scan(
+			&rec.Id,
+			&rec.ItemName,
+			&rec.ItemType,
+			&rec.ItemCode,
+			&rec.ItemPrice,
+			&rec.Quantity,
+			&rec.TotalAmount,
+			&rec.TotalTax,
+			&rec.SubTotal,
+			&rec.InvoiceId,
+		)
+		if utils.CheckErr(&err) {
+			return nil, err
+		}
+		resp = append(resp, rec)
+	}
+	return &resp, nil
+}
 
-	err := ur.db.Raw("EXEC EtaRecievedInvoicesHeadInsert  @InternalId = ? , @TotalAmount = ? , @TotalTax = ? , @IssuerName = ?, @IssuerRin = ?, @DateTimeIssued = ? , @DateTimeRecieved = ?   ", req.Invoice.InternalId,
-		req.Invoice.TotalAmount,
-		req.Invoice.TotalTax,
-		req.Invoice.IssuerName,
-		req.Invoice.IssuerRin,
-		req.Invoice.DateTimeIssued,
-		req.Invoice.DateTimeRecieved,
+func (ur *InvoiceRepo) RecievedInvoiceList(req *model.ListReceivedReq) (*[]model.ListReceivedResp, error) {
+	var resp []model.ListReceivedResp
+	rows, err := ur.db.Raw("EXEC EtaRecievedInvoicesHeadList  @FromDate = ? , @ToDate = ? , @Rin = ?",
+		req.FromDate,
+		req.ToDate,
+		req.Rin,
+	).Rows()
+	if utils.CheckErr(&err) {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var rec model.ListReceivedResp
+		err := rows.Scan(
+			&rec.Id,
+			&rec.UUID,
+			&rec.InternalId,
+			&rec.TotalAmount,
+			&rec.TotalTax,
+			&rec.IssuerName,
+			&rec.IssuerRin,
+			&rec.DateTimeIssued,
+			&rec.DateTimeReceived,
+		)
+		if utils.CheckErr(&err) {
+			return nil, err
+		}
+		resp = append(resp, rec)
+	}
+	return &resp, nil
+}
+
+func (ur *InvoiceRepo) RecievedInvoiceInsert(invoice model.EtaRecentDocumentsItem, items []model.DetailsInvoiceLine) (*int, error) {
+	var resp int
+	err := ur.db.Raw("EXEC EtaRecievedInvoicesHeadInsert  @UUID = ? , @InternalId = ? , @TotalAmount = ? , @TotalTax = ? , @IssuerName = ?, @IssuerRin = ?, @DateTimeIssued = ? , @DateTimeRecieved = ?   ",
+		invoice.Uuid,
+		invoice.InternalId,
+		invoice.TotalSales,
+		invoice.TotalTax,
+		invoice.IssuerName,
+		invoice.IssuerId,
+		invoice.DateTimeIssued,
+		invoice.DateTimeReceived,
 	).Row().Scan(&resp)
 	if utils.CheckErr(&err) {
 		return nil, err
 	}
 
-	for _, v := range req.Items {
+	for _, v := range items {
 		err := ur.db.Raw("EXEC EtaRecievedInvoicesDetailsInsert @InvoiceID = ?  , @ItemName = ? ,@ItemType = ? ,@ItemCode = ? ,@Price = ?  ,@Quantity = ?  ,@TotalAmount = ?  ,@TotalTax = ?  ,@SubTotal = ?    ", resp,
-			v.ItemName, v.ItemType, v.ItemCode, v.Price, v.Quantity, v.TotalAmount, v.TotalTax, v.SubTotal,
+			v.Description, v.ItemType, v.ItemCode, v.UnitValue.AmountEGP, v.Quantity, v.Total, v.Total-v.NetTotal, v.NetTotal,
 		).Row().Scan(&resp)
 		if utils.CheckErr(&err) {
 			return nil, err
@@ -56,6 +118,16 @@ func (ur *InvoiceRepo) RecievedInvoiceInsert(req *model.ReceivedInvoiceInsertReq
 	}
 	return &resp, nil
 }
+
+func (ur *InvoiceRepo) RecievedInvoiceCheckExists(uuid *string) bool {
+	var resp int
+	err := ur.db.Raw("EXEC EtaRecievedInvoicesCheckExists @UUID = ?", uuid).Row().Scan(&resp)
+	if utils.CheckErr(&err) {
+		return false
+	}
+	return true
+}
+
 func (ur *InvoiceRepo) EInvoiceHeadPost(serial *uint64, store *uint64) (*int, error) {
 	var resp int
 	err := ur.db.Raw("EXEC StkTrEInvoicePosted @serial = ? , @store = ?  ", serial, store).Row().Scan(&resp)

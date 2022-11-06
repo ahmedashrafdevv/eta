@@ -22,11 +22,17 @@ func (h *Handler) Register(v1 *echo.Group) {
 	orders.GET("", h.OrdersListByTransSerialStoreConvertedDate)
 
 	// invoices routes
+	dashboard := api.Group("/dashboard")
+	dashboard.GET("", h.DashboardStats)
+	dashboard.GET("/store", h.DashboardStoreStats)
+
 	invoices := api.Group("/invoices")
 	invoices.GET("", h.InvoicesList)
-	invoices.GET("/recent", h.InvoicesRecentList)
-	invoices.GET("/recent/:id", h.InvoicesRecentView)
+	invoices.GET("/recent", h.RecivedInvoicesList)
+	invoices.GET("/recent/:id", h.RecievedInvoiceListItems)
+	invoices.PUT("/recent/reject/:id", h.RecievedInvoiceReject)
 	invoices.POST("/post", h.InvoicePost)
+	invoices.POST("/etl", h.InvoicesRecentEtl)
 
 	// receipt routes
 	receipt := api.Group("/receipts")

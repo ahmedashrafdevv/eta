@@ -30,7 +30,7 @@ var client = &http.Client{}
 var location, _ = time.LoadLocation("Africa/Cairo")
 var lastLoginExpiresAt time.Time
 var posToken string
-var token string
+var erpToken string
 
 func GenerateConfigBasedOnEnv(key string) string {
 	fullKey := fmt.Sprintf("%s_%s", key, config.Config("ENVIRONMENT"))
@@ -52,10 +52,18 @@ func SetPosAuthorization(req *http.Request) {
 }
 func SetAuthorization(req *http.Request) {
 	isTokenExpired := time.Now().Before(lastLoginExpiresAt)
-	if isTokenExpired || token == "" {
+	fmt.Println("isTokenExpired")
+	fmt.Println(time.Now())
+	fmt.Println(lastLoginExpiresAt)
+	fmt.Println(!isTokenExpired)
+	fmt.Println("erpToken")
+	fmt.Println(erpToken)
+	fmt.Println(erpToken == "")
+	fmt.Println(!isTokenExpired || erpToken == "")
+	if !isTokenExpired || erpToken == "" {
 		EtaLogin()
 	}
-	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Authorization", "Bearer "+erpToken)
 	SetContentType(req)
 }
 
@@ -102,13 +110,16 @@ func EtaLogin() (string, error) {
 	d, _ := ioutil.ReadAll(resp.Body)
 	err := json.Unmarshal(d, &response)
 	if err != nil {
+		fmt.Println("error parsing login response :" + string(d))
 		return "", err
 	}
-	fmt.Println("url")
-	fmt.Println(string(d))
+	// fmt.Println("url")
+	// fmt.Println(string(d))
 	resp.Body.Close()
 	lastLoginExpiresAt = time.Now().In(location).Add(1 * time.Hour)
-	token = response.AccessToken
+
+	erpToken = response.AccessToken
+
 	return response.AccessToken, nil
 }
 
@@ -127,9 +138,7 @@ func EtaRecentDocuments() (*model.EtaRecentDocumentsResponse, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("resp.Body")
-	fmt.Println(string(d))
-	fmt.Println(url)
+
 	// fmt.Println(string(resp.Body))
 	resp.Body.Close()
 	return &response, nil
@@ -148,15 +157,51 @@ func EtaRecentDocumentView(id string) (*model.EtaInvoiceDetailsResp, error) {
 	d, _ := ioutil.ReadAll(resp.Body)
 	err := json.Unmarshal(d, &response)
 	if err != nil {
-		fmt.Println("error parsing")
+		str := fmt.Sprintf("error parsing uuid : %s", id)
+		fmt.Println(str)
 		return nil, err
 	}
-	fmt.Println("resp.Body")
-	fmt.Println(string(d))
-	fmt.Println(url)
+	// fmt.Println("resp.Body")
+	// fmt.Println(string(d))
+	// fmt.Println(url)
 	// fmt.Println(string(resp.Body))
 	resp.Body.Close()
 	return &response, nil
+}
+
+func EtaRecentDocumentReject(id *string, body *model.EtaInvoiceRejectBody) (*string, error) {
+	// var response model.EtaInvoiceDetailsResp
+	// var body model.EtaInvoiceRejectBody
+
+	jsonValue, _ := json.Marshal(*body)
+
+	// resp, err := http.Post(config.Config("SIGNER_URL")+"sign", "application/json", bytes.NewBuffer(jsonValue))
+	resource := fmt.Sprintf("documents/state/%s/decline/rejection", *id)
+	url := base_url + resource
+
+	r, _ := http.NewRequest(http.MethodPut, url, nil)
+	// SetContentType(r)
+	// SetAuthorization(r)
+
+	resp, _ := client.Do(r)
+	d, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println("url")
+	fmt.Println(url)
+	fmt.Println("resp.Body")
+	fmt.Println(string(d))
+	fmt.Println("json.Body")
+	fmt.Println(string(jsonValue))
+	return &url, nil
+	// err := json.Unmarshal(d, &response)
+	// if err != nil {
+	// 	fmt.Println("error parsing")
+	// 	return nil, err
+	// }
+
+	// fmt.Println(url)
+	// fmt.Println(string(resp.Body))
+	resp.Body.Close()
+	return nil, nil
 }
 func EtaLoginPos() (string, error) {
 	var response model.EtaLoginResponse
@@ -228,9 +273,9 @@ func SubmitReceipt(document *model.ReceiptSubmitRequest) (*model.EtaSubmitInvoic
 		fmt.Println("error forming request")
 		return nil, err
 	}
-	fmt.Println(string(d))
-	fmt.Println(url)
-	fmt.Println(r.Method)
+	// fmt.Println(string(d))
+	// fmt.Println(url)
+	// fmt.Println(r.Method)
 
 	// fmt.Println(d)
 	err = json.Unmarshal(d, &response)
