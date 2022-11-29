@@ -52,14 +52,6 @@ func SetPosAuthorization(req *http.Request) {
 }
 func SetAuthorization(req *http.Request) {
 	isTokenExpired := time.Now().Before(lastLoginExpiresAt)
-	fmt.Println("isTokenExpired")
-	fmt.Println(time.Now())
-	fmt.Println(lastLoginExpiresAt)
-	fmt.Println(!isTokenExpired)
-	fmt.Println("erpToken")
-	fmt.Println(erpToken)
-	fmt.Println(erpToken == "")
-	fmt.Println(!isTokenExpired || erpToken == "")
 	if !isTokenExpired || erpToken == "" {
 		EtaLogin()
 	}

@@ -92,7 +92,7 @@ func (ur *InvoiceRepo) RecievedInvoiceList(req *model.ListReceivedReq) (*[]model
 	return &resp, nil
 }
 
-func (ur *InvoiceRepo) RecievedInvoiceInsert(invoice model.EtaRecentDocumentsItem, items []model.DetailsInvoiceLine) (*int, error) {
+func (ur *InvoiceRepo) RecievedInvoiceHeadInsert(invoice model.EtaRecentDocumentsItem) (*int, error) {
 	var resp int
 	err := ur.db.Raw("EXEC EtaRecievedInvoicesHeadInsert  @UUID = ? , @InternalId = ? , @TotalAmount = ? , @TotalTax = ? , @IssuerName = ?, @IssuerRin = ?, @DateTimeIssued = ? , @DateTimeRecieved = ?   ",
 		invoice.Uuid,
@@ -108,14 +108,18 @@ func (ur *InvoiceRepo) RecievedInvoiceInsert(invoice model.EtaRecentDocumentsIte
 		return nil, err
 	}
 
-	for _, v := range items {
-		err := ur.db.Raw("EXEC EtaRecievedInvoicesDetailsInsert @InvoiceID = ?  , @ItemName = ? ,@ItemType = ? ,@ItemCode = ? ,@Price = ?  ,@Quantity = ?  ,@TotalAmount = ?  ,@TotalTax = ?  ,@SubTotal = ?    ", resp,
-			v.Description, v.ItemType, v.ItemCode, v.UnitValue.AmountEGP, v.Quantity, v.Total, v.Total-v.NetTotal, v.NetTotal,
-		).Row().Scan(&resp)
-		if utils.CheckErr(&err) {
-			return nil, err
-		}
+	return &resp, nil
+}
+
+func (ur *InvoiceRepo) RecievedInvoiceDetailsInsert(parent *int, item model.DetailsInvoiceLine) (*int, error) {
+	var resp int
+	err := ur.db.Raw("EXEC EtaRecievedInvoicesDetailsInsert @InvoiceID = ?  , @ItemName = ? ,@ItemType = ? ,@ItemCode = ? ,@Price = ?  ,@Quantity = ?  ,@TotalAmount = ?  ,@TotalTax = ?  ,@SubTotal = ?    ", parent,
+		item.Description, item.ItemType, item.ItemCode, item.UnitValue.AmountEGP, item.Quantity, item.Total, item.Total-item.NetTotal, item.NetTotal,
+	).Row().Scan(&resp)
+	if utils.CheckErr(&err) {
+		return nil, err
 	}
+
 	return &resp, nil
 }
 
@@ -251,7 +255,7 @@ func scanEInvoiceResult(rows *sql.Rows) (*[]model.EInvoice, error) {
 			return nil, err
 		}
 
-		internalID := fmt.Sprintf("%s-%d-", rec.InternalID, rec.Serial)
+		internalID := fmt.Sprintf("%s-%d", rec.InternalID, rec.Serial)
 		rec.InternalID = internalID
 		rec.TotalTax = roundFloat(rec.TotalAmount*.14, 5)
 		rec.NetAmount = roundFloat((rec.TotalAmount - rec.TotalTax), 5)

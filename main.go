@@ -22,6 +22,7 @@ func main() {
 	receiptRepo := repo.NewReceiptRepo(db)
 	storeRepo := repo.NewStoreRepo(db)
 	companyRepo := repo.NewCompanyRepo(db)
+	localInvoiceRepo := repo.NewLocalInvoiceRepo(db)
 	companyInfo, err := companyRepo.Find()
 	if err != nil {
 		panic(err)
@@ -30,6 +31,7 @@ func main() {
 		userRepo,
 		orderRepo,
 		invoiceRepo,
+		localInvoiceRepo,
 		receiptRepo,
 		storeRepo,
 		companyInfo,

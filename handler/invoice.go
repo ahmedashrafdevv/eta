@@ -3,22 +3,19 @@ package handler
 import (
 	"eta/model"
 	"eta/utils"
+	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/labstack/echo/v4"
 )
 
-func handleDate(s *string) {
-	if idx := strings.Index(*s, "."); idx != -1 {
-		*s = (*s)[:idx]
-	}
-	*s = strings.Replace(*s, "T", " ", 1)
-	*s = strings.Replace(*s, "Z", "", 1)
-}
 func (h *Handler) InvoicesRecentEtl(c echo.Context) error {
 	d, err := utils.EtaRecentDocuments()
-	var result []model.EtaRecentDocumentsItem
+	type resultStruct struct {
+		invoice model.EtaRecentDocumentsItem
+		items   []model.DetailsInvoiceLine
+	}
+	var result []resultStruct
 	// var req []model.ReceivedInvoiceInsertReq
 	if utils.CheckErr(&err) {
 		return c.JSON(http.StatusOK, err.Error())
@@ -28,26 +25,34 @@ func (h *Handler) InvoicesRecentEtl(c echo.Context) error {
 			existed := h.invoiceRepo.RecievedInvoiceCheckExists(&v.Uuid)
 			if !existed {
 				v.TotalTax = v.Total - v.TotalSales
-				handleDate(&v.DateTimeIssued)
-				handleDate(&v.DateTimeReceived)
+				utils.HandleDate(&v.DateTimeIssued)
+				utils.HandleDate(&v.DateTimeReceived)
 
 				v.TotalTax = utils.RoundFloat(&v.TotalTax, 5)
-
+				parentId, err := h.invoiceRepo.RecievedInvoiceHeadInsert(v)
+				if utils.CheckErr(&err) {
+					return c.JSON(http.StatusOK, err.Error())
+				}
 				invoiceDetails, err := utils.EtaRecentDocumentView(v.Uuid)
 				if utils.CheckErr(&err) {
 					return c.JSON(http.StatusOK, err.Error())
 				}
 
-				_, err = h.invoiceRepo.RecievedInvoiceInsert(v, invoiceDetails.InvoiceLines)
-				if utils.CheckErr(&err) {
-					return c.JSON(http.StatusOK, err.Error())
+				fmt.Println("inv")
+				result = append(result, resultStruct{invoice: v, items: invoiceDetails.InvoiceLines})
+				for _, item := range invoiceDetails.InvoiceLines {
+					fmt.Print('1')
+					_, err = h.invoiceRepo.RecievedInvoiceDetailsInsert(parentId, item)
+					if utils.CheckErr(&err) {
+						return c.JSON(http.StatusOK, err.Error())
+					}
 				}
-				result = append(result, v)
+				fmt.Println(result)
 			}
 		}
 	}
 
-	return c.JSON(http.StatusOK, d)
+	return c.JSON(http.StatusOK, result)
 }
 
 func (h *Handler) RecivedInvoicesList(c echo.Context) error {
