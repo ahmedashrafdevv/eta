@@ -2,6 +2,7 @@ package handler
 
 import (
 	"eta/model"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -34,6 +35,14 @@ func (h *Handler) InvoicesLocalList(c echo.Context) error {
 	return c.JSON(http.StatusOK, orders)
 }
 
+func (h *Handler) InvoicesLocalClose(c echo.Context) error {
+	code, _ := strconv.Atoi(c.Param("id"))
+	items, err := h.localInvoiceRepo.ELocalInvoicesOrderClose(code)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+	return c.JSON(http.StatusOK, items)
+}
 func (h *Handler) InvoicesLocalUpdateItem(c echo.Context) error {
 	req := new(model.UpdateOrderItemReq)
 	if err := c.Bind(req); err != nil {
@@ -74,12 +83,15 @@ func (h *Handler) InvoicesLocalDocNo(c echo.Context) error {
 }
 
 func (h *Handler) InvoicesLocalOrderInsert(c echo.Context) error {
-	// code, _ := strconv.Atoi(string(c.Get("id")))
-
+	// code := c.Get("id").(int)
+	fmt.Println("c.Get()")
+	fmt.Println(c.Get("exp"))
+	// fmt.Println(c.Get())
 	req := new(model.InsertOrderReq)
 	if err := c.Bind(req); err != nil {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
+	// req.EmpCode = code
 	id, err := h.localInvoiceRepo.ELocalInvoicesOrderInsert(req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err)

@@ -57,12 +57,12 @@ func (ir *LocalInvoiceRepo) ELocalInvoicesList(req *model.ListInvoiceReq) (*[]mo
 	return &orders, nil
 }
 
-func (ir *LocalInvoiceRepo) ELocalInvoicesListItems(invoiceSerial int) (*[]model.LocalInvoiceDetails, error) {
+func (ir *LocalInvoiceRepo) ELocalInvoicesListItems(invoiceSerial int) (*model.LocalInvoiceResp, error) {
 	rows, err := ir.db.Raw("EXEC StkTrInvoiceDetailsList @Serial = ? ", invoiceSerial).Rows()
 	if err != nil {
 		return nil, err
 	}
-	var items []model.LocalInvoiceDetails
+	var resp model.LocalInvoiceResp
 	defer rows.Close()
 	for rows.Next() {
 		var item model.LocalInvoiceDetails
@@ -70,10 +70,24 @@ func (ir *LocalInvoiceRepo) ELocalInvoicesListItems(invoiceSerial int) (*[]model
 		if err != nil {
 			return nil, err
 		}
-		items = append(items, item)
+		resp.Items = append(resp.Items, item)
 	}
 
-	return &items, nil
+	if rows.NextResultSet() {
+		for rows.Next() {
+			err := rows.Scan(
+				&resp.Totals.SubTotal,
+				&resp.Totals.Tax,
+				&resp.Totals.Total,
+			)
+			if utils.CheckErr(&err) {
+				return nil, err
+			}
+
+		}
+	}
+
+	return &resp, nil
 }
 
 func (ir *LocalInvoiceRepo) ListItems(store int) (*[]model.ItemModel, error) {
@@ -124,6 +138,15 @@ func (ir *LocalInvoiceRepo) ELocalInvoicesOrderItemInsert(req *model.InsertOrder
 func (ir *LocalInvoiceRepo) ELocalInvoicesOrderItemUpdate(req *model.UpdateOrderItemReq) (*int, error) {
 	var result int
 	err := ir.db.Raw("EXEC StkTrInvoiceDetailsUpdate @Serial = ?, @Qnt = ?", req.Serial, req.Qnt).Row().Scan(&result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (ir *LocalInvoiceRepo) ELocalInvoicesOrderClose(serial int) (*int, error) {
+	var result int
+	err := ir.db.Raw("EXEC StkTrInvoiceOrderClose @Serial = ?", serial).Row().Scan(&result)
 	if err != nil {
 		return nil, err
 	}

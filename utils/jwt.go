@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -14,5 +15,8 @@ func GenerateJWT(id uint) string {
 	claims["id"] = id
 	claims["exp"] = time.Now().Add(time.Hour * 300).Unix()
 	t, _ := token.SignedString(JWTSecret)
+
+	fmt.Println("claims")
+	fmt.Println(claims)
 	return t
 }

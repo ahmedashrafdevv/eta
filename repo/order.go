@@ -31,20 +31,26 @@ func (ur *OrderRepo) ListByTransSerialStoreConvertedDate(req *model.ListOrdersRe
 	return result, nil
 }
 
-func (ur *OrderRepo) DashboardStoreStats(req *model.DashboardStatsRequest) (*[]model.DashboardStoreStatsResponse, error) {
-	var resp []model.DashboardStoreStatsResponse
+func (ur *OrderRepo) DashboardStoreStats(req *model.DashboardStatsRequest) (*model.DashboardStoreStatsResponse, error) {
+	var resp model.DashboardStoreStatsResponse
 	rows, err := ur.db.Raw("EXEC EtaDashboardStoreStats @start_date = ? , @end_date = ?", req.FromDate, req.ToDate).Rows()
 	if utils.CheckErr(&err) {
 		return nil, err
 	}
 	defer rows.Close()
+
 	for rows.Next() {
-		var rec model.DashboardStoreStatsResponse
-		err := rows.Scan(&rec.TotalAmount, &rec.TotalTax, &rec.StoreName, &rec.StoreCode)
+		var rec model.DashboardStoreStats
+		err := rows.Scan(&rec.TotalAmount, &rec.TotalTax, &rec.StoreName, &rec.StoreCode, &rec.Orders)
 		if utils.CheckErr(&err) {
 			return nil, err
 		}
-		resp = append(resp, rec)
+		rec.NetAmount = rec.TotalAmount - rec.TotalTax
+		resp.Totals.TotalAmount += rec.TotalAmount
+		resp.Totals.Orders += rec.Orders
+		resp.Totals.TotalTax += rec.TotalTax
+		resp.Totals.NetAmount += rec.NetAmount
+		resp.Data = append(resp.Data, rec)
 
 	}
 	return &resp, nil

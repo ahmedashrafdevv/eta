@@ -1,13 +1,14 @@
 package handler
 
 import (
+	"eta/router/middleware"
+	"eta/utils"
+
 	"github.com/labstack/echo/v4"
 )
 
 func (h *Handler) Register(v1 *echo.Group) {
-	// jwtMiddleware := middleware.JWT(utils.JWTSecret)
-	// auth := v1.Group("/", jwtMiddleware)
-
+	jwtMiddleware := middleware.JWT(utils.JWTSecret)
 	v1.GET("/health", h.CheckHealth)
 	api := v1.Group("/api")
 	api.POST("/test", h.Test)
@@ -37,13 +38,14 @@ func (h *Handler) Register(v1 *echo.Group) {
 	invoices.POST("/etl", h.InvoicesRecentEtl)
 
 	// Local invoices
-	invoices.GET("/local", h.InvoicesLocalList)
-	invoices.GET("/local/items/:id", h.InvoicesLocalListItems)
-	invoices.DELETE("/local/items/:id", h.InvoicesLocalDeleteItem)
-	invoices.PUT("/local/items", h.InvoicesLocalUpdateItem)
-	invoices.GET("/local/no", h.InvoicesLocalDocNo)
-	invoices.POST("/local", h.InvoicesLocalOrderInsert)
-	invoices.POST("/local/item", h.InvoicesLocalOrderItemInsert)
+	invoices.GET("/local", h.InvoicesLocalList, jwtMiddleware)
+	invoices.GET("/local/items/:id", h.InvoicesLocalListItems, jwtMiddleware)
+	invoices.DELETE("/local/items/:id", h.InvoicesLocalDeleteItem, jwtMiddleware)
+	invoices.PUT("/local/items", h.InvoicesLocalUpdateItem, jwtMiddleware)
+	invoices.PUT("/local/close/:id", h.InvoicesLocalClose, jwtMiddleware)
+	invoices.GET("/local/no", h.InvoicesLocalDocNo, jwtMiddleware)
+	invoices.POST("/local", h.InvoicesLocalOrderInsert, jwtMiddleware)
+	invoices.POST("/local/item", h.InvoicesLocalOrderItemInsert, jwtMiddleware)
 
 	// receipt routes
 	receipt := api.Group("/receipts")

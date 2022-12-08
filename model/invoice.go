@@ -37,6 +37,16 @@ type LocalInvoiceHead struct {
 	SalesOrderNo   int
 }
 
+type LocalInvoiceResp struct {
+	Items  []LocalInvoiceDetails
+	Totals LocalInvoiceTotals
+}
+
+type LocalInvoiceTotals struct {
+	SubTotal float64
+	Tax      float64
+	Total    float64
+}
 type LocalInvoiceDetails struct {
 	Serial    int
 	BarCode   string
