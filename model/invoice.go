@@ -9,9 +9,9 @@ type ItemModel struct {
 }
 
 type ListInvoiceReq struct {
-	Finished *bool
-	Deleted  *bool
-	EmpCode  *int
+	Finished *bool  `query:"Finished"`
+	Deleted  *bool  `query:"Deleted"`
+	EmpCode  *int   `query:"EmpCode"`
 	DateFrom string `query:"start_date"`
 	DateTo   string `query:"end_date"`
 }
